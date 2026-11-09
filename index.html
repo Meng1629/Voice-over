@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Voice Chat - Unlimited Group & ID Join</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body {
+            background: radial-gradient(circle at top, #1e293b, #0f172a);
+            color: #f8fafc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .main-card {
+            background: rgba(30, 41, 59, 0.96);
+            width: 100%;
+            max-width: 560px;
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .header { text-align: center; margin-bottom: 22px; }
+        .tag {
+            display: inline-block;
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 4px 14px;
+            border-radius: 20px;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        h2 { font-size: 1.65rem; color: #fff; font-weight: 800; }
+
+        .tab-buttons {
+            display: flex;
+            gap: 8px;
+            background: #0b1120;
+            padding: 5px;
+            border-radius: 12px;
+            margin-bottom: 18px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 11px;
+            border: none;
+            background: transparent;
+            color: #94a3b8;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+        .tab-btn.active { background: #0284c7; color: #fff; }
+
+        .input-group { margin-bottom: 14px; }
+        label { display: block; font-size: 0.84rem; color: #94a3b8; margin-bottom: 6px; font-weight: 600; }
+        input, select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid #334155;
+            background: #0b1120;
+            color: #fff;
+            font-size: 0.95rem;
+            outline: none;
+        }
+        input:focus, select:focus { border-color: #38bdf8; }
+
+        .id-join-box {
+            background: rgba(2, 132, 199, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 18px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.95; transform: translateY(-1px); }
+        .btn-create { background: linear-gradient(135deg, #10b981, #059669); color: #fff; }
+        .btn-join { background: linear-gradient(135deg, #0284c7, #0369a1); color: #fff; }
+
+        .group-list-box {
+            margin-top: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .group-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #0b1120;
+            padding: 12px 14px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        .group-meta strong { display: block; color: #f1f5f9; font-size: 0.95rem; }
+        .group-meta span { font-size: 0.78rem; color: #38bdf8; font-weight: 600; }
+        .join-badge-btn {
+            background: #0284c7;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        /* Voice Room UI */
+        #voice-room { display: none; }
+        .room-title-bar {
+            background: #0b1120;
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+        .room-title-info h3 { color: #38bdf8; font-size: 1.2rem; }
+        .room-title-info p { color: #e2e8f0; font-size: 0.9rem; margin-top: 4px; font-weight: 700; }
+        .copy-btn {
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #38bdf8;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 0.82rem;
+        }
+        .copy-btn:hover { background: #38bdf8; color: #0f172a; }
+
+        .mic-meter-box {
+            background: #0b1120;
+            padding: 12px 14px;
+            border-radius: 10px;
+            margin-bottom: 14px;
+            border: 1px solid #334155;
+        }
+        .meter-bar-bg {
+            width: 100%;
+            height: 10px;
+            background: #1e293b;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+        .meter-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #22c55e, #4ade80);
+            transition: width 0.05s linear;
+        }
+
+        #active-members {
+            max-height: 240px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .member-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #0b1120;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: border-color 0.15s;
+        }
+        .member-item.speaking {
+            border-color: #22c55e;
+            box-shadow: 0 0 12px rgba(34, 197, 94, 0.25);
+        }
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: #22c55e;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #22c55e;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        .status-dot.muted {
+            background: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 14px;
+        }
+        .btn-mute { background: #ef4444; color: #fff; }
+        .btn-mute.active { background: #f59e0b; color: #000; }
+        .btn-test { background: #334155; color: #f8fafc; }
+        .btn-test.active { background: #10b981; color: #fff; }
+        .btn-leave { background: #1e293b; color: #f87171; border: 1px solid #ef4444; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="main-card">
+    <div class="header">
+        <span class="tag">UNLIMITED SQUAD VOICE</span>
+        <h2>Team Voice Group</h2>
+    </div>
+
+    <!-- LOBBY SECTION -->
+    <div id="lobby-section">
+        <div class="input-group">
+            <label>ឈ្មោះរបស់អ្នក (Your Name)</label>
+            <input type="text" id="username" placeholder="ឧ. Meng_Leader" value="Player_01" />
+        </div>
+
+        <div class="tab-buttons">
+            <button class="tab-btn active" id="tab-join-btn" onclick="showTab('join')">ចូលក្រុមតាម ID (Join Group)</button>
+            <button class="tab-btn" id="tab-create-btn" onclick="showTab('create')">+ បង្កើតក្រុមថ្មី (Create Group)</button>
+        </div>
+
+        <!-- TAB 1: JOIN BY ID OR LIST -->
+        <div id="tab-join-view">
+            <div class="id-join-box">
+                <label style="color:#38bdf8; font-size:0.9rem;">វាយបញ្ចូលលេខកូដក្រុម (Enter Group ID to Join):</label>
+                <div style="display:flex; gap: 8px; margin-top: 6px;">
+                    <input type="text" id="direct-room-id" placeholder="ឧ. GP1024 ឬ VIP99" style="flex:1; font-weight:700; text-transform:uppercase;" />
+                    <button class="btn btn-join" style="width: auto; padding: 12px 22px;" onclick="joinDirectRoom()">ចូលក្រុម (Join)</button>
+                </div>
+            </div>
+
+            <label>ឬជ្រើសរើសក្រុមដែលកំពុង Online ស្រាប់ (គ្មានដែនកំណត់សមាជិក):</label>
+            <div class="group-list-box" id="groups-container">
+                <p style="color:#64748b; font-size:0.85rem; text-align:center; padding: 20px;">មិនទាន់មានក្រុមនៅឡើយទេ។ ចុច "+ បង្កើតក្រុមថ្មី" ដើម្បីចាប់ផ្ដើម!</p>
+            </div>
+        </div>
+
+        <!-- TAB 2: CREATE GROUP -->
+        <div id="tab-create-view" style="display: none;">
+            <div class="input-group">
+                <label>ឈ្មោះក្រុមរបស់អ្នក (Team / Group Name)</label>
+                <input type="text" id="new-group-name" placeholder="ឧ. Khmer_Fireteam" value="Khmer_Squad" />
+            </div>
+            <div class="input-group">
+                <label>កំណត់លេខកូដ Group ID សម្រាប់ឱ្យមិត្តភក្តិវាយចូល (ទុកទទេដើម្បីបង្កើតស្វ័យប្រវត្តិ)</label>
+                <input type="text" id="custom-group-id" placeholder="ឧ. TEAM01, MENG99 (ឬទុកទទេ)" style="text-transform:uppercase; font-weight:700;" />
+            </div>
+            <button class="btn btn-create" onclick="createNewGroup()">+ បង្កើតក្រុម និងបើក Voice ភ្លាមៗ</button>
+        </div>
+    </div>
+
+    <!-- VOICE ROOM SECTION -->
+    <div id="voice-room">
+        <div class="room-title-bar">
+            <div class="room-title-info">
+                <h3 id="current-room-name">Squad Name</h3>
+                <p>Group ID: <span id="current-room-id" style="color:#4ade80;">...</span></p>
+            </div>
+            <button class="copy-btn" onclick="copyGroupId()">📋 ចម្លង ID (Copy ID)</button>
+        </div>
+
+        <div class="input-group">
+            <label>ជ្រើសរើស Microphone (Audio Input):</label>
+            <select id="mic-select" onchange="switchMicrophone(this.value)"></select>
+        </div>
+
+        <div class="mic-meter-box">
+            <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#94a3b8;">
+                <span>កម្រិតសំឡេង Mic របស់អ្នក:</span>
+                <span id="mic-status-text" style="color:#22c55e; font-weight:700;">កំពុងដំណើរការ (Active)</span>
+            </div>
+            <div class="meter-bar-bg">
+                <div class="meter-bar-fill" id="local-mic-bar"></div>
+            </div>
+        </div>
+
+        <label style="margin-bottom: 8px;">សមាជិកក្នុងក្រុម (គ្មានដែនកំណត់ - <span id="member-count" style="color:#38bdf8;">1</span> នាក់ Online):</label>
+        <div id="active-members"></div>
+
+        <div class="control-grid">
+            <button id="mute-btn" class="btn btn-mute" onclick="toggleMute()">🎤 បិទ Mic (Mute)</button>
+            <button id="loopback-btn" class="btn btn-test" onclick="toggleLoopback()">🔊 តេស្តសំឡេងខ្លួនឯង</button>
+        </div>
+        <button class="btn btn-leave" onclick="leaveVoiceRoom()">ចាកចេញពីក្រុម (Leave Group)</button>
+    </div>
+</div>
+
+<div id="audio-container"></div>
+<audio id="loopback-audio" muted></audio>
+
+<script>
+    const socket = io();
+    let localStream = null;
+    let audioContext = null;
+    let localAnalyser = null;
+    let isMuted = false;
+    let isLoopback = false;
+    let activeGroupIdText = "";
+
+    const peers = {};
+    const iceQueues = {};
+
+    const rtcConfig = {
+        iceServers: [
+            { urls: "stun:stun.l.google.com:19302" },
+            { urls: "stun:stun1.l.google.com:19302" }
+        ]
+    };
+
+    function showTab(type) {
+        document.getElementById('tab-join-btn').classList.toggle('active', type === 'join');
+        document.getElementById('tab-create-btn').classList.toggle('active', type === 'create');
+        document.getElementById('tab-join-view').style.display = (type === 'join') ? 'block' : 'none';
+        document.getElementById('tab-create-view').style.display = (type === 'create') ? 'block' : 'none';
+    }
+
+    function copyGroupId() {
+        if (!activeGroupIdText) return;
+        navigator.clipboard.writeText(activeGroupIdText);
+        alert('បានចម្លង Group ID: ' + activeGroupIdText + '\nផ្ញើលេខកូដនេះឱ្យសមាជិកក្រុមវាយចូលបានភ្លាមៗ!');
+    }
+
+    // Update Lobby Group List (Unlimited Members)
+    socket.on('group-list-updated', (groupList) => {
+        const container = document.getElementById('groups-container');
+        if (!groupList || groupList.length === 0) {
+            container.innerHTML = '<p style="color:#64748b; font-size:0.85rem; text-align:center; padding:20px;">មិនទាន់មានក្រុមនៅឡើយទេ។ ចុច "+ បង្កើតក្រុមថ្មី" ដើម្បីចាប់ផ្ដើម!</p>';
+            return;
+        }
+
+        container.innerHTML = '';
+        groupList.forEach(grp => {
+            const item = document.createElement('div');
+            item.className = 'group-item';
+            item.innerHTML = `
+                <div class="group-meta">
+                    <strong>${grp.name}</strong>
+                    <span>Group ID: ${grp.id} | សមាជិកកំពុង Online: ${grp.currentMembers} នាក់</span>
+                </div>
+                <button class="join-badge-btn" onclick="joinTargetGroup('${grp.id}')">
+                    Join
+                </button>
+            `;
+            container.appendChild(item);
+        });
+    });
+
+    function createNewGroup() {
+        const username = document.getElementById('username').value.trim();
+        const groupName = document.getElementById('new-group-name').value.trim();
+        const customGroupId = document.getElementById('custom-group-id').value.trim();
+
+        if (!username) return alert('សូមបញ្ចូលឈ្មោះរបស់អ្នក!');
+        if (!groupName) return alert('សូមដាក់ឈ្មោះក្រុម!');
+
+        socket.emit('create-group', { groupName, customGroupId, creatorName: username });
+    }
+
+    socket.on('group-created', ({ roomId }) => {
+        joinTargetGroup(roomId);
+    });
+
+    function joinDirectRoom() {
+        const roomId = document.getElementById('direct-room-id').value.trim();
+        if (!roomId) return alert('សូមវាយបញ្ចូលលេខកូដ Group ID!');
+        joinTargetGroup(roomId);
+    }
+
+    async function initLocalMicrophone(deviceId = null) {
+        try {
+            if (localStream) {
+                localStream.getTracks().forEach(t => t.stop());
+            }
+            const constraints = {
+                audio: deviceId ? { deviceId: { exact: deviceId }, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+                                : { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                video: false
+            };
+            localStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const micSelect = document.getElementById('mic-select');
+            micSelect.innerHTML = '';
+            devices.filter(d => d.kind === 'audioinput').forEach((d, idx) => {
+                const opt = document.createElement('option');
+                opt.value = d.deviceId;
+                opt.text = d.label || `Microphone ${idx + 1}`;
+                if (deviceId && d.deviceId === deviceId) opt.selected = true;
+                micSelect.appendChild(opt);
+            });
+
+            setupAudioMeter(localStream);
+
+            const loopAudio = document.getElementById('loopback-audio');
+            loopAudio.srcObject = localStream;
+            loopAudio.muted = !isLoopback;
+            if (isLoopback) loopAudio.play().catch(() => {});
+
+            return true;
+        } catch (err) {
+            alert('មិនអាចបើក Microphone បានទេ៖ ' + err.message + '\nសូមចុច Allow Microphone លើ Browser របស់អ្នក។');
+            return false;
+        }
+    }
+
+    async function switchMicrophone(newDeviceId) {
+        const ok = await initLocalMicrophone(newDeviceId);
+        if (ok && localStream) {
+            const newAudioTrack = localStream.getAudioTracks()[0];
+            newAudioTrack.enabled = !isMuted;
+            Object.values(peers).forEach(peer => {
+                const sender = peer.getSenders().find(s => s.track && s.track.kind === 'audio');
+                if (sender) sender.replaceTrack(newAudioTrack);
+            });
+        }
+    }
+
+    function setupAudioMeter(stream) {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioContext.state === 'suspended') {
+            audioContext.resume();
+        }
+        const source = audioContext.createMediaStreamSource(stream);
+        localAnalyser = audioContext.createAnalyser();
+        localAnalyser.fftSize = 256;
+        source.connect(localAnalyser);
+
+        const dataArray = new Uint8Array(localAnalyser.frequencyBinCount);
+        const bar = document.getElementById('local-mic-bar');
+
+        function updateMeter() {
+            if (!localAnalyser) return;
+            localAnalyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            const avg = sum / dataArray.length;
+            const percent = Math.min(100, Math.round((avg / 80) * 100));
+            bar.style.width = isMuted ? '0%' : percent + '%';
+
+            const myItem = document.getElementById('user-me');
+            if (myItem) {
+                myItem.classList.toggle('speaking', !isMuted && percent > 12);
+            }
+            requestAnimationFrame(updateMeter);
+        }
+        updateMeter();
+    }
+
+    async function joinTargetGroup(roomId) {
+        const username = document.getElementById('username').value.trim();
+        if (!username) return alert('សូមបញ្ចូលឈ្មោះរបស់អ្នក!');
+
+        const micOk = await initLocalMicrophone();
+        if (!micOk) return;
+
+        socket.emit('join-room', { roomId, userName: username });
+    }
+
+    function updateMemberCountUI() {
+        const count = document.getElementById('active-members').children.length;
+        document.getElementById('member-count').innerText = count;
+    }
+
+    // Joined Room Event
+    socket.on('room-joined', ({ roomId, groupName, existingMembers }) => {
+        const username = document.getElementById('username').value.trim();
+        activeGroupIdText = roomId;
+
+        document.getElementById('lobby-section').style.display = 'none';
+        document.getElementById('voice-room').style.display = 'block';
+        document.getElementById('current-room-name').innerText = groupName;
+        document.getElementById('current-room-id').innerText = roomId;
+        document.getElementById('active-members').innerHTML = '';
+
+        addMemberUI('me', username + ' (អ្នក)', false);
+
+        existingMembers.forEach(member => {
+            addMemberUI(member.id, member.name, member.muted);
+        });
+        updateMemberCountUI();
+    });
+
+    // New peer joined -> Send WebRTC Offer
+    socket.on('peer-joined', async ({ peerId, userName }) => {
+        addMemberUI(peerId, userName, false);
+        updateMemberCountUI();
+        const pc = createPeerConnection(peerId);
+        try {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            socket.emit('webrtc-offer', { to: peerId, offer: pc.localDescription });
+        } catch (err) {
+            console.error('Error creating offer:', err);
+        }
+    });
+
+    // Receive Offer -> Send Answer
+    socket.on('webrtc-offer', async ({ from, userName, offer }) => {
+        addMemberUI(from, userName, false);
+        updateMemberCountUI();
+        const pc = createPeerConnection(from);
+        try {
+            await pc.setRemoteDescription(new RTCSessionDescription(offer));
+            await flushIceQueue(from);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socket.emit('webrtc-answer', { to: from, answer: pc.localDescription });
+        } catch (err) {
+            console.error('Error handling offer:', err);
+        }
+    });
+
+    // Receive Answer
+    socket.on('webrtc-answer', async ({ from, answer }) => {
+        const pc = peers[from];
+        if (!pc) return;
+        try {
+            await pc.setRemoteDescription(new RTCSessionDescription(answer));
+            await flushIceQueue(from);
+        } catch (err) {
+            console.error('Error setting remote answer:', err);
+        }
+    });
+
+    // Receive ICE Candidate
+    socket.on('webrtc-ice-candidate', async ({ from, candidate }) => {
+        if (!candidate) return;
+        const pc = peers[from];
+        if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(candidate));
+            } catch (e) {
+                console.error('ICE add error:', e);
+            }
+        } else {
+            if (!iceQueues[from]) iceQueues[from] = [];
+            iceQueues[from].push(candidate);
+        }
+    });
+
+    async function flushIceQueue(peerId) {
+        const pc = peers[peerId];
+        if (!pc || !iceQueues[peerId]) return;
+        while (iceQueues[peerId].length > 0) {
+            const c = iceQueues[peerId].shift();
+            try {
+                await pc.addIceCandidate(new RTCIceCandidate(c));
+            } catch (e) {
+                console.error('Queue ICE error:', e);
+            }
+        }
+    }
+
+    function createPeerConnection(peerId) {
+        if (peers[peerId]) {
+            peers[peerId].close();
+        }
+        const pc = new RTCPeerConnection(rtcConfig);
+        peers[peerId] = pc;
+
+        if (localStream) {
+            localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+        }
+
+        pc.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('webrtc-ice-candidate', {
+                    to: peerId,
+                    candidate: event.candidate
+                });
+            }
+        };
+
+        pc.ontrack = (event) => {
+            playRemoteAudio(peerId, event.streams[0]);
+        };
+
+        return pc;
+    }
+
+    function playRemoteAudio(peerId, stream) {
+        let audio = document.getElementById('audio-' + peerId);
+        if (!audio) {
+            audio = document.createElement('audio');
+            audio.id = 'audio-' + peerId;
+            audio.autoplay = true;
+            audio.playsInline = true;
+            document.getElementById('audio-container').appendChild(audio);
+        }
+        audio.srcObject = stream;
+        audio.volume = 1.0;
+        audio.play().catch(err => console.warn('Autoplay retry:', err));
+
+        try {
+            if (audioContext) {
+                const src = audioContext.createMediaStreamSource(stream);
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                src.connect(analyser);
+                const data = new Uint8Array(analyser.frequencyBinCount);
+                function checkRemoteVoice() {
+                    if (!peers[peerId]) return;
+                    analyser.getByteFrequencyData(data);
+                    let sum = 0;
+                    for (let i = 0; i < data.length; i++) sum += data[i];
+                    const avg = sum / data.length;
+                    const item = document.getElementById('user-' + peerId);
+                    if (item) item.classList.toggle('speaking', avg > 10);
+                    requestAnimationFrame(checkRemoteVoice);
+                }
+                checkRemoteVoice();
+            }
+        } catch (e) {}
+    }
+
+    socket.on('peer-mute-status', ({ peerId, isMuted }) => {
+        const dot = document.getElementById('dot-' + peerId);
+        const badge = document.getElementById('badge-' + peerId);
+        if (dot) dot.className = isMuted ? 'status-dot muted' : 'status-dot';
+        if (badge) {
+            badge.innerText = isMuted ? 'MUTED' : 'LIVE';
+            badge.style.color = isMuted ? '#ef4444' : '#38bdf8';
+        }
+    });
+
+    socket.on('peer-left', ({ peerId }) => {
+        if (peers[peerId]) {
+            peers[peerId].close();
+            delete peers[peerId];
+        }
+        delete iceQueues[peerId];
+        const audio = document.getElementById('audio-' + peerId);
+        if (audio) audio.remove();
+        const el = document.getElementById('user-' + peerId);
+        if (el) el.remove();
+        updateMemberCountUI();
+    });
+
+    function addMemberUI(id, name, muted) {
+        const container = document.getElementById('active-members');
+        if (document.getElementById('user-' + id)) return;
+        const div = document.createElement('div');
+        div.className = 'member-item';
+        div.id = 'user-' + id;
+        div.innerHTML = `
+            <div style="display:flex; align-items:center;">
+                <span id="dot-${id}" class="status-dot ${muted ? 'muted' : ''}"></span>
+                <span style="font-weight:600;">${name}</span>
+            </div>
+            <span id="badge-${id}" style="font-size:0.78rem; color:${muted ? '#ef4444' : '#38bdf8'}; font-weight:700;">
+                ${muted ? 'MUTED' : 'LIVE'}
+            </span>
+        `;
+        container.appendChild(div);
+    }
+
+    function toggleMute() {
+        if (!localStream) return;
+        isMuted = !isMuted;
+        localStream.getAudioTracks().forEach(t => t.enabled = !isMuted);
+
+        const btn = document.getElementById('mute-btn');
+        btn.innerText = isMuted ? '🔇 បើក Mic វិញ (Unmute)' : '🎤 បិទ Mic (Mute)';
+        btn.className = isMuted ? 'btn btn-mute active' : 'btn btn-mute';
+
+        const statusTxt = document.getElementById('mic-status-text');
+        statusTxt.innerText = isMuted ? 'បានបិទ (Muted)' : 'កំពុងដំណើរការ (Active)';
+        statusTxt.style.color = isMuted ? '#ef4444' : '#22c55e';
+
+        const myDot = document.getElementById('dot-me');
+        const myBadge = document.getElementById('badge-me');
+        if (myDot) myDot.className = isMuted ? 'status-dot muted' : 'status-dot';
+        if (myBadge) {
+            myBadge.innerText = isMuted ? 'MUTED' : 'LIVE';
+            myBadge.style.color = isMuted ? '#ef4444' : '#38bdf8';
+        }
+
+        socket.emit('mute-status', { isMuted });
+    }
+
+    function toggleLoopback() {
+        isLoopback = !isLoopback;
+        const loopAudio = document.getElementById('loopback-audio');
+        loopAudio.muted = !isLoopback;
+        if (isLoopback) loopAudio.play().catch(() => {});
+
+        const btn = document.getElementById('loopback-btn');
+        btn.innerText = isLoopback ? '🔊 កំពុងស្ដាប់សំឡេងខ្លួនឯង (ON)' : '🔊 តេស្តសំឡេងខ្លួនឯង';
+        btn.className = isLoopback ? 'btn btn-test active' : 'btn btn-test';
+    }
+
+    function leaveVoiceRoom() {
+        socket.emit('leave-room');
+        Object.keys(peers).forEach(id => {
+            peers[id].close();
+            delete peers[id];
+        });
+        document.getElementById('audio-container').innerHTML = '';
+        if (localStream) {
+            localStream.getTracks().forEach(t => t.stop());
+            localStream = null;
+        }
+        isLoopback = false;
+        document.getElementById('loopback-audio').muted = true;
+        document.getElementById('voice-room').style.display = 'none';
+        document.getElementById('lobby-section').style.display = 'block';
+    }
+</script>
+
+</body>
+</html>
